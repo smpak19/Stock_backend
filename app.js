@@ -1,5 +1,6 @@
 const express = require('express')
 const http = require('http')
+const { constants } = require('http2')
 const app = express()
 const server = http.createServer(app)
 const mongoose = require('mongoose')
@@ -7,13 +8,19 @@ const mongoose = require('mongoose')
 const UserSchema = new mongoose.Schema({
     name: String,
     pass: String,
+    account: Number,
+    trk: [{
+        coinName: String,
+        trade: Number,
+        amount: Number,
+    }],
     saveDate: {
         type: Date,
         defualt: Date.now,
     },
 })
 
-const User = mongoose.model("User", UserSchema)
+const User = mongoose.model("User", UserSchema, 'UserInfo')
 
 const io = require('socket.io')(server)
 
@@ -22,27 +29,58 @@ app.get('/', (req, res) => {
   });
 
 io.sockets.on('connection', (socket) => {
-    console.log('Socket connected : ${socket.id}')
+    console.log(`Socket connected : ${socket.id}`)
 
     socket.on('disconnect', () => {
-        console.log('Socket disconnected : ${socket.id}')
+        console.log(`Socket disconnected : ${socket.id}`)
     })
 
     socket.on('signin', (data) => {
         const userData = JSON.parse(data)
         const id = userData.id
         const pwd = userData.pwd
-
-        const newUser = new User({
-            name: id,
-            pass: pwd,
+        
+        User.find({'name': id}).then((result) => {
+            if(result.length == 0) {
+                socket.emit('sign_in_success')
+                const newUser = new User({
+                    name: id,
+                    pass: pwd,
+                    account: 100000000,
+                })
+        
+                newUser.save().then(() => {console.log(newUser)}).catch((err) => {
+                    console.log("Error: " + err)
+                })        
+            } else {
+                socket.emit('duplicate_id',)
+                console.log("Duplicate Id detect")
+            }
         })
+    })
 
-        newUser.save().then(() => {console.log(newUser)}).catch((err) => {
-            console.log("Error: " + err)
+    socket.on('kakao_signin', (data) => {
+        const userData = JSON.parse(data)
+        const id = userData.id
+        const pwd = userData.pwd
+        
+        User.find({'name': id}).then((result) => {
+            if(result.length == 0) {
+                socket.emit('kakao_sign')
+                const newUser = new User({
+                    name: id,
+                    pass: pwd,
+                    account: 100000000,
+                })
+        
+                newUser.save().then(() => {console.log(newUser)}).catch((err) => {
+                    console.log("Error: " + err)
+                })        
+            } else {
+                socket.emit('kakao_true', )
+                console.log('login complete')
+            }
         })
-
-        console.log(`[Username : ${id}] entered [room number : ${pwd}]`)
     })
 
     socket.on('login', (data) => {
@@ -62,6 +100,28 @@ io.sockets.on('connection', (socket) => {
         .catch((err) => {
             console.log(err)
         })
+    })
+
+    socket.on('get_account', (user_id) => {
+        User.findOne({'name':user_id}).exec(function(err, user) {
+            const account = user.account
+            console.log(`get account from ${user.account}`)
+            socket.emit('give_account', account)
+        })
+    })
+
+    socket.on('buy', (data) => {
+        const coinData = JSON.parse(data)
+        const userid = coinData.userid
+        const coinname = coinData.coinname
+        const amount = coinData.amount
+        const price = coinData.price
+
+        User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id}, {$inc: {'account': -price}})).
+        then(() => User.findOne({'name': userid})).then(doc => User.updateOne({_id: doc._id},{$push: {trk: {'coinName': coinname, 'trade': price, 'amount': price}}}))
+        console.log(`buy complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
+        socket.emit('buy_success',)
+    
     })
 })
 

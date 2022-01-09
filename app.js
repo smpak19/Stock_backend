@@ -103,7 +103,7 @@ io.sockets.on('connection', (socket) => {
     })
 
     socket.on('get_account', (user_id) => {
-        User.findOne({'name':user_id}).exec(function(err, user) {
+            User.findOne({'name':user_id}).exec(function(err, user) {
             const account = user.account
             console.log(`get account from ${user.account}`)
             socket.emit('give_account', account)
@@ -117,11 +117,75 @@ io.sockets.on('connection', (socket) => {
         const amount = coinData.amount
         const price = coinData.price
 
-        User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id}, {$inc: {'account': -price}})).
-        then(() => User.findOne({'name': userid})).then(doc => User.updateOne({_id: doc._id},{$push: {trk: {'coinName': coinname, 'trade': price, 'amount': price}}}))
+        //잔고 업데이트
+        User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id}, {$inc: {'account': -price}}))
+
+        //코인 리스트 업데이트(없을 시 추가, 있을 시 매수평균가 수정)
+        /*
+        User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id},{$push: {trk: {'coinName': coinname, 'trade': price, 'amount': amount}}}))
+        */
+
+        User.findOne({'name': userid}).then( async (doc) => {
+            if(doc.trk.some(item => item.coinName == coinname)) {
+                await User.updateOne({_id: doc._id, 'trk.coinName': coinname}, {$inc: {'trk.$.amount': amount, 'trk.$.trade': price}})
+            } else {
+                await User.updateOne({_id: doc._id},{$push: {trk: {'coinName': coinname, 'trade': price, 'amount': amount}}})
+            }
+        })
+    
         console.log(`buy complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
         socket.emit('buy_success',)
     
+    })
+
+    socket.on('get_amount', (data) => {
+        const Data = JSON.parse(data)
+        const userid = Data.userid
+        const ticker = Data.ticker
+        
+        User.findOne({'name': userid}).exec(function(err, doc) {
+            var cnt = 0
+            for (var i = 0; i < doc.trk.length; i++ ) {
+                if(doc.trk[i].coinName == ticker) {
+                    socket.emit('set_amount', doc.trk[i].amount)
+                    cnt += 1
+                }
+            }
+            if(cnt == 0) {
+                socket.emit('set_amount', 0.0)
+            }
+        })
+    })
+
+    socket.on('sell', async (data) => {
+        const coinData = JSON.parse(data)
+        const userid = coinData.userid
+        const coinname = coinData.coinname
+        const amount = coinData.amount
+        const price = coinData.price
+
+        //잔고 업데이트
+        User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id}, {$inc: {'account': price}}))
+        
+        User.findOne({'name': userid}).then( async (doc) => {
+           await User.updateOne({_id: doc._id, 'trk.coinName': coinname}, {$inc: {'trk.$.amount': -amount, 'trk.$.trade': -price}}) 
+        })
+ 
+        console.log(`sell complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
+        socket.emit('sell_success',)
+    
+    })
+
+    socket.on('get_total', (user_id) => {
+        User.findOne({'name': user_id}).exec(function(err, doc) {
+            var total = 0
+            for (var i = 0; i < doc.trk.length; i++ ) {
+                total += doc.trk[i].trade
+            }
+            console.log(`total asset: ${total}`)
+            socket.emit('give_maesu', total)
+            socket.emit('give_total', total + doc.account)
+        })
     })
 })
 

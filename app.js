@@ -109,7 +109,6 @@ io.sockets.on('connection', (socket) => {
     socket.on('get_account', (user_id) => {
             User.findOne({'name':user_id}).exec(function(err, user) {
             const account = user.account
-            console.log(`get account from ${user.account}`)
             socket.emit('give_account', account)
         })
     })
@@ -163,7 +162,6 @@ io.sockets.on('connection', (socket) => {
 
     socket.on('sell', (data) => {
         const coinData = JSON.parse(data)
-        console.log(coinData)
         const userid = coinData.userid
         const coinname = coinData.coinname
         const amount = coinData.amount
@@ -193,7 +191,6 @@ io.sockets.on('connection', (socket) => {
             for (var i = 0; i < doc.trk.length; i++ ) {
                 total += doc.trk[i].trade
             }
-            console.log(`total asset: ${total}`)
             socket.emit('give_maesu', total)
         })
     })
@@ -247,7 +244,6 @@ io.sockets.on('connection', (socket) => {
         const Data = JSON.parse(data)
         const id = Data.userid
         const cur = Data.current
-        console.log(`set current with ${cur}`)
         await User.findOneAndUpdate({'name': id}, {$set: {current: cur}})
     })
 

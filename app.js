@@ -157,8 +157,9 @@ io.sockets.on('connection', (socket) => {
         })
     })
 
-    socket.on('sell', async (data) => {
+    socket.on('sell', (data) => {
         const coinData = JSON.parse(data)
+        console.log(coinData)
         const userid = coinData.userid
         const coinname = coinData.coinname
         const amount = coinData.amount
@@ -172,7 +173,7 @@ io.sockets.on('connection', (socket) => {
         })
  
         console.log(`sell complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
-        socket.emit('sell_success',)
+        return socket.emit('sell_success',)
     
     })
 

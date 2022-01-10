@@ -1,3 +1,4 @@
+const { query } = require('express')
 const express = require('express')
 const http = require('http')
 const { constants } = require('http2')
@@ -180,6 +181,13 @@ io.sockets.on('connection', (socket) => {
     
     })
 
+    socket.on('merge', (userid) => {
+        User.findOne({'name':userid}).then((doc) => {
+            console.log(doc)
+            User.updateOne({_id:doc._id}, {$pull: {'trk': {'amount': {$eq: 0}}}}, (err, doc) => console.log(doc))
+        })
+    })
+
     socket.on('get_total', (user_id) => {
         User.findOne({'name': user_id}).exec(function(err, doc) {
             var total = 0
@@ -236,11 +244,12 @@ io.sockets.on('connection', (socket) => {
     })
 
     // Fragment 3 : Get user_id and ranking info
-    socket.on('set_current', (data) => {
+    socket.on('set_current', async (data) => {
         const Data = JSON.parse(data)
         const id = Data.userid
         const cur = Data.current
-        User.findOneAndUpdate({'name': userid}, {$set: {'current': current}})
+        console.log(`set current with ${cur}`)
+        await User.findOneAndUpdate({'name': id}, {$set: {current: cur}})
     })
 
     socket.on('get_current', () => {
@@ -256,8 +265,8 @@ io.sockets.on('connection', (socket) => {
     })
 
     socket.on('reset', (user_id) => {
-        User.findOne({'name': id}).then((doc) => {
-            User.updateOne({_id: doc._id}, {$set: {'account': 500000000, 'trk' : []}})
+        User.findOne({'name': id}).then( async (doc) => {
+            await User.updateOne({_id: doc._id}, {$set: {'account': 500000000, 'trk' : []}})
         })
     })
 
@@ -267,9 +276,9 @@ io.sockets.on('connection', (socket) => {
         const userid = pwdData.userid
         const current = pwdData.current
         const newpwd = pwdData.newp
-        User.findOne({'name': userid}).then((doc) => {
+        User.findOne({'name': userid}).then(async (doc) => {
             if(doc.pass == current) {
-                User.updateOne({_id: doc._id}, {$set: {'pass': newpwd}})
+                await User.updateOne({_id: doc._id}, {$set: {'pass': newpwd}})
                 socket.emit('change_complete')
             } else {
                 socket.emit('wrong_pass')

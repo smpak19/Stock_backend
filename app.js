@@ -253,7 +253,7 @@ io.sockets.on('connection', (socket) => {
     })
 
     socket.on('get_current', () => {
-        const data = User.find({}, {current:1, _id:0})
+        const data = User.find({}, {name: 1, current:1, _id:0})
         socket.emit('here', data)
     })
     

@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
     name: String,
     pass: String,
     account: Number,
+    current: Number,
     trk: [{
         coinName: String,
         trade: Number,
@@ -47,6 +48,7 @@ io.sockets.on('connection', (socket) => {
                     name: id,
                     pass: pwd,
                     account: 500000000,
+                    current: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -71,6 +73,7 @@ io.sockets.on('connection', (socket) => {
                     name: id,
                     pass: pwd,
                     account: 500000000,
+                    current: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -169,15 +172,7 @@ io.sockets.on('connection', (socket) => {
         User.findOne({'name': userid}).then(doc => User.updateOne({_id: doc._id}, {$inc: {'account': price}}))
         
         User.findOne({'name': userid}).then( async (doc) => {
-           await User.updateOne({_id: doc._id, 'trk.coinName': coinname}, {$inc: {'trk.$.amount': -amount, 'trk.$.trade': -price}}) 
-        })
-
-        User.findOne({'name': userid}).then( async (doc) =>{
-            for(var i=0 ; i < doc.trk.length ; i ++ ) {
-                if(doc.trk[i].coinName == coinname && doc.trk[i].amount == 0) {
-                    await User.updateOne({_id: doc_id}, {$pull: {trk: {'coinName': coinname}}})
-                }
-            } 
+           await User.updateOne({_id: doc._id, 'trk.coinName': coinname}, {$inc: {'trk.$.amount': -amount, 'trk.$.trade': -price}})
         })
  
         console.log(`sell complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
@@ -212,7 +207,6 @@ io.sockets.on('connection', (socket) => {
                     arr.push(0.0)
                 }
             }
-            console.log(arr)
             socket.emit('arrayget', arr)
         })
 
@@ -235,7 +229,6 @@ io.sockets.on('connection', (socket) => {
                     arr.push(0.0)
                 }
             }
-            console.log(arr)
             socket.emit('listget', arr)
         })
 
@@ -243,6 +236,17 @@ io.sockets.on('connection', (socket) => {
     })
 
     // Fragment 3 : Get user_id and ranking info
+    socket.on('set_current', (data) => {
+        const Data = JSON.parse(data)
+        const id = Data.userid
+        const cur = Data.current
+        User.findOneAndUpdate({'name': userid}, {$set: {'current': current}})
+    })
+
+    socket.on('get_current', () => {
+        const data = User.find({}, {current:1, _id:0})
+        socket.emit('here', data)
+    })
     
 
     // Fragment 4 : 1) delete account 2) asset reset 3) change pwd
@@ -255,18 +259,22 @@ io.sockets.on('connection', (socket) => {
         User.findOne({'name': id}).then((doc) => {
             User.updateOne({_id: doc._id}, {$set: {'account': 500000000, 'trk' : []}})
         })
-        socket.emit('reset_complete')
     })
 
     // Should we implement requirement of current pwd? .. later
     socket.on('change_pwd', (data) => {
-        const accData = JSON.parse(data)
-        const id = accData.userid
-        const newpwd = accData.pwd
-        User.findOne({'name': id}).then((doc) => {
-            User.updateOne({_id: doc._id}, {$set: {'pass': newpwd}})
+        const pwdData = JSON.parse(data)
+        const userid = pwdData.userid
+        const current = pwdData.current
+        const newpwd = pwdData.newp
+        User.findOne({'name': userid}).then((doc) => {
+            if(doc.pass == current) {
+                User.updateOne({_id: doc._id}, {$set: {'pass': newpwd}})
+                socket.emit('change_complete')
+            } else {
+                socket.emit('wrong_pass')
+            } 
         })
-        socket.emit('change_complete')
     })
 })
 

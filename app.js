@@ -46,7 +46,7 @@ io.sockets.on('connection', (socket) => {
                 const newUser = new User({
                     name: id,
                     pass: pwd,
-                    account: 100000000,
+                    account: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -70,7 +70,7 @@ io.sockets.on('connection', (socket) => {
                 const newUser = new User({
                     name: id,
                     pass: pwd,
-                    account: 100000000,
+                    account: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -171,6 +171,14 @@ io.sockets.on('connection', (socket) => {
         User.findOne({'name': userid}).then( async (doc) => {
            await User.updateOne({_id: doc._id, 'trk.coinName': coinname}, {$inc: {'trk.$.amount': -amount, 'trk.$.trade': -price}}) 
         })
+
+        User.findOne({'name': userid}).then( async (doc) =>{
+            for(var i=0 ; i < doc.trk.length ; i ++ ) {
+                if(doc.trk[i].coinName == coinname && doc.trk[i].amount == 0) {
+                    await User.updateOne({_id: doc_id}, {$pull: {trk: {'coinName': coinname}}})
+                }
+            } 
+        })
  
         console.log(`sell complete with ${userid} : ${coinname} amount ${amount} total price ${price}`) 
         return socket.emit('sell_success',)
@@ -185,8 +193,80 @@ io.sockets.on('connection', (socket) => {
             }
             console.log(`total asset: ${total}`)
             socket.emit('give_maesu', total)
-            socket.emit('give_total', total + doc.account)
         })
+    })
+
+    socket.on('array', (user_id) => {
+        User.findOne({'name': user_id}).exec(function(err, doc) {
+            var arr = []
+            for (var item of ["BTC", "LINK", "ETH", "XRP", "SAND", "DOGE", "BORA", "BTT", "ADA", "EOS"]) {
+                var tick = false
+                for (var i = 0; i < doc.trk.length; i++ ) {
+                    if(doc.trk[i].coinName == item) {
+                        arr.push(doc.trk[i].amount)
+                        tick = true
+                        break
+                    }
+                }
+                if(!tick) {
+                    arr.push(0.0)
+                }
+            }
+            console.log(arr)
+            socket.emit('arrayget', arr)
+        })
+
+        
+    })
+
+    socket.on('list', (user_id) => {
+        User.findOne({'name': user_id}).exec(function(err, doc) {
+            var arr = []
+            for (var item of ["BTC", "LINK", "ETH", "XRP", "SAND", "DOGE", "BORA", "BTT", "ADA", "EOS"]) {
+                var tick = false
+                for (var i = 0; i < doc.trk.length; i++ ) {
+                    if(doc.trk[i].coinName == item) {
+                        arr.push(doc.trk[i].trade)
+                        tick = true
+                        break
+                    }
+                }
+                if(!tick) {
+                    arr.push(0.0)
+                }
+            }
+            console.log(arr)
+            socket.emit('listget', arr)
+        })
+
+        
+    })
+
+    // Fragment 3 : Get user_id and ranking info
+    
+
+    // Fragment 4 : 1) delete account 2) asset reset 3) change pwd
+    socket.on('delete_account', (user_id) => {
+        User.deleteOne({'name': user_id})
+        socket.emit('delete_complete')
+    })
+
+    socket.on('reset', (user_id) => {
+        User.findOne({'name': id}).then((doc) => {
+            User.updateOne({_id: doc._id}, {$set: {'account': 500000000, 'trk' : []}})
+        })
+        socket.emit('reset_complete')
+    })
+
+    // Should we implement requirement of current pwd? .. later
+    socket.on('change_pwd', (data) => {
+        const accData = JSON.parse(data)
+        const id = accData.userid
+        const newpwd = accData.pwd
+        User.findOne({'name': id}).then((doc) => {
+            User.updateOne({_id: doc._id}, {$set: {'pass': newpwd}})
+        })
+        socket.emit('change_complete')
     })
 })
 

@@ -253,19 +253,21 @@ io.sockets.on('connection', (socket) => {
     })
 
     socket.on('get_current', () => {
-        const data = User.find({}, {name: 1, current:1, _id:0})
-        socket.emit('here', data)
+        User.find({}, {name: 1, current:1, _id:0}).sort([['current', -1]]).exec((err, data) => {
+            socket.emit('here', data)
+        })
     })
     
 
     // Fragment 4 : 1) delete account 2) asset reset 3) change pwd
     socket.on('delete_account', (user_id) => {
-        User.deleteOne({'name': user_id})
-        socket.emit('delete_complete')
+        User.deleteOne({'name': user_id}).exec((err, doc) => {
+            socket.emit('delete_complete')
+        })
     })
 
     socket.on('reset', (user_id) => {
-        User.findOne({'name': id}).then( async (doc) => {
+        User.findOne({'name': user_id}).then( async (doc) => {
             await User.updateOne({_id: doc._id}, {$set: {'account': 500000000, 'trk' : []}})
         })
     })

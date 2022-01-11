@@ -177,8 +177,8 @@ io.sockets.on('connection', (socket) => {
     })
 
     socket.on('merge', (userid) => {
-        User.findOne({'name':userid}).then((doc) => {
-            User.updateOne({_id:doc._id}, {$pull: {'trk': {'amount': {$eq: 0}}}})
+        User.findOne({'name':userid}).then(async (doc) => {
+            await User.updateOne({_id:doc._id}, {$pull: {'trk': {'amount': {$eq: 0}}}})
         })
     })
 

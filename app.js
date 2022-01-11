@@ -10,7 +10,6 @@ const UserSchema = new mongoose.Schema({
     name: String,
     pass: String,
     account: Number,
-    current: Number,
     trk: [{
         coinName: String,
         trade: Number,
@@ -49,7 +48,6 @@ io.sockets.on('connection', (socket) => {
                     name: id,
                     pass: pwd,
                     account: 500000000,
-                    current: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -74,7 +72,6 @@ io.sockets.on('connection', (socket) => {
                     name: id,
                     pass: pwd,
                     account: 500000000,
-                    current: 500000000,
                 })
         
                 newUser.save().then(() => {console.log(newUser)}).catch((err) => {
@@ -240,16 +237,35 @@ io.sockets.on('connection', (socket) => {
     })
 
     // Fragment 3 : Get user_id and ranking info
-    socket.on('set_current', async (data) => {
-        const Data = JSON.parse(data)
-        const id = Data.userid
-        const cur = Data.current
-        await User.findOneAndUpdate({'name': id}, {$set: {current: cur}})
-    })
 
-    socket.on('get_current', () => {
-        User.find({}, {name: 1, current:1, _id:0}).sort([['current', -1]]).exec((err, data) => {
-            socket.emit('here', data)
+    socket.on('get_current', (curp) => {
+        var cup = JSON.parse(curp)
+        User.find({}, {name: 1, account:1, trk: 1, _id:0}).exec((err, data) => {
+            var result = []
+            for(var j = 0 ; j < data.length ; j ++) {
+                const id = data[j].name
+                const acc = data[j].account
+                var arr = []
+                for (var item of ["BTC", "LINK", "ETH", "XRP", "SAND", "DOGE", "BORA", "BTT", "ADA", "EOS"]) {
+                    var tick = false
+                    for (var i = 0; i < data[j].trk.length; i++ ) {
+                        if(data[j].trk[i].coinName == item) {
+                            arr.push(data[j].trk[i].amount)
+                            tick = true
+                            break
+                        }
+                    }
+                    if(!tick) {
+                        arr.push(0.0)
+                    }
+                }
+                var sum = 0
+                for (var k = 0; k < cup.length; k ++) {
+                    sum += arr[k] * Number(cup[k].replace(/,/g, ''))
+                }
+                result.push([id, sum + acc])
+            } 
+            socket.emit('here', result.sort(sortFunction))
         })
     })
     
@@ -293,6 +309,15 @@ mongoose.connect('mongodb+srv://jinnam:1130@cluster0.kxooq.mongodb.net/myFirstDa
 .catch((err) => {
     console.log(err);
 });
+
+function sortFunction(a,b) {
+    if(a[1] === b[1]) {
+        return 0
+    }
+    else {
+        return (a[1] < b[1]) ? 1 : -1
+    }
+}
 
 
 server.listen(80, () => {
